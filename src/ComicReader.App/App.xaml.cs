@@ -19,6 +19,18 @@ public partial class App : Application
             if (SmokeMode) Environment.Exit(2);
         };
 
+        if (e.Args.Length >= 2 && e.Args[0] == "--bench")
+        {
+            var target = e.Args[1];
+            var outFile = e.Args.Length >= 4 && e.Args[2] == "--bench-out"
+                ? e.Args[3]
+                : Path.Combine(AppPaths.DataDir, "bench.txt");
+            AppPaths.Ensure();
+            var benchCode = Task.Run(() => Bench.BenchRunner.Run(target, outFile)).GetAwaiter().GetResult();
+            Environment.Exit(benchCode);
+            return;
+        }
+
         AppServices.Initialize();
 
         var window = new MainWindow { DataContext = AppServices.Main };

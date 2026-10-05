@@ -34,14 +34,16 @@ public sealed class ComicPage
     public int Index { get; }
     public string Name { get; }
     public long Size { get; }
+    public long CompressedSize { get; }
 
     internal object Handle { get; }
 
-    internal ComicPage(int index, string name, long size, object handle)
+    internal ComicPage(int index, string name, long size, long compressedSize, object handle)
     {
         Index = index;
         Name = name;
         Size = size;
+        CompressedSize = compressedSize;
         Handle = handle;
     }
 }
@@ -62,6 +64,7 @@ public sealed class ComicBook : IDisposable
         new(SupportedImageExtensions, StringComparer.OrdinalIgnoreCase);
 
     private readonly IArchive? _archive;
+    private readonly ZipBackend? _zip;
     private readonly string? _folderPath;
     private readonly object _gate = new();
     private bool _disposed;
@@ -79,6 +82,7 @@ public sealed class ComicBook : IDisposable
         IReadOnlyList<ComicPage> pages,
         ComicInfo? info,
         IArchive? archive,
+        ZipBackend? zip,
         string? folderPath)
     {
         Path = path;
@@ -87,6 +91,7 @@ public sealed class ComicBook : IDisposable
         Pages = pages;
         Info = info;
         _archive = archive;
+        _zip = zip;
         _folderPath = folderPath;
     }
 
@@ -102,6 +107,21 @@ public sealed class ComicBook : IDisposable
     {
         if (Directory.Exists(path)) return OpenFolder(path);
         if (!File.Exists(path)) throw new ComicBookException($"文件不存在：{path}");
+
+        // Fast path: unencrypted ZIP/CBZ via the native .NET inflater (zlib),
+        // roughly 3-4x faster than the managed SharpCompress implementation.
+        var zip = ZipBackend.TryOpen(path);
+        if (zip is not null)
+        {
+            var zipPages = zip.Pages
+                .Select(p => new ComicPage(p.Index, p.Name, p.Size, p.CompressedSize, p.FullName))
+                .ToList();
+            var zipInfo = zip.ComicInfoXml is not null ? ComicInfo.TryParse(zip.ComicInfoXml) : null;
+            var zipTitle = !string.IsNullOrWhiteSpace(zipInfo?.Title)
+                ? zipInfo!.Title!
+                : System.IO.Path.GetFileNameWithoutExtension(path);
+            return new ComicBook(path, ComicBookKind.Archive, zipTitle, zipPages, zipInfo, archive: null, zip: zip, folderPath: null);
+        }
 
         IArchive archive;
         try
@@ -135,7 +155,7 @@ public sealed class ComicBook : IDisposable
             }
 
             var pages = entries
-                .Select((e, i) => new ComicPage(i, System.IO.Path.GetFileName(e.Key!), e.Size, e))
+                .Select((e, i) => new ComicPage(i, System.IO.Path.GetFileName(e.Key!), e.Size, e.CompressedSize, e))
                 .ToList();
 
             ComicInfo? info = null;
@@ -160,7 +180,7 @@ public sealed class ComicBook : IDisposable
                 ? info!.Title!
                 : System.IO.Path.GetFileNameWithoutExtension(path);
 
-            var book = new ComicBook(path, ComicBookKind.Archive, title, pages, info, archive, null);
+            var book = new ComicBook(path, ComicBookKind.Archive, title, pages, info, archive, zip: null, folderPath: null);
 
             // Probe the first page so encryption problems surface immediately.
             try
@@ -197,7 +217,11 @@ public sealed class ComicBook : IDisposable
         if (files.Count == 0) throw new ComicBookException("文件夹内没有可读取的图片。");
 
         var pages = files
-            .Select((f, i) => new ComicPage(i, System.IO.Path.GetFileName(f), new FileInfo(f).Length, f))
+            .Select((f, i) =>
+            {
+                var length = new FileInfo(f).Length;
+                return new ComicPage(i, System.IO.Path.GetFileName(f), length, length, f);
+            })
             .ToList();
 
         ComicInfo? info = null;
@@ -215,7 +239,7 @@ public sealed class ComicBook : IDisposable
         }
 
         var title = !string.IsNullOrWhiteSpace(info?.Title) ? info!.Title! : DirectoryName(path);
-        return new ComicBook(path, ComicBookKind.Folder, title, pages, info, null, path);
+        return new ComicBook(path, ComicBookKind.Folder, title, pages, info, archive: null, zip: null, folderPath: path);
     }
 
     private static string DirectoryName(string path)
@@ -229,6 +253,12 @@ public sealed class ComicBook : IDisposable
     {
         if (index < 0 || index >= Pages.Count) throw new ArgumentOutOfRangeException(nameof(index));
         var page = Pages[index];
+
+        if (_zip is not null)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            return new MemoryStream(_zip.Read((string)page.Handle), writable: false);
+        }
 
         lock (_gate)
         {
@@ -267,6 +297,8 @@ public sealed class ComicBook : IDisposable
             _disposed = true;
             _archive?.Dispose();
         }
+
+        _zip?.Dispose();
     }
 
     private static bool IsCryptoError(Exception ex) =>

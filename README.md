@@ -21,6 +21,34 @@
 - **深色 / 浅色主题**，中文界面
 - **拖拽打开**：把压缩包拖进窗口即可阅读
 
+## 性能
+
+ZIP/CBZ 使用 .NET 原生 zlib（`System.IO.Compression`）+ 多实例并行读取；RAR/7Z/TAR 与加密压缩包使用 SharpCompress。阅读器会预取接下来的页面，缩略图并行生成，解码缓存带 LRU 与内存压力回收。
+
+基准数据（240 页 JPEG、22MB CBZ、16 核机器，`--bench` 模式实测）：
+
+| 指标 | 优化前（SharpCompress） | 优化后（原生 zlib + 实例池） |
+| --- | --- | --- |
+| 打开并列出页面 | 2.2 ms | **0.9 ms** |
+| 顺序解压吞吐（deflate） | ~125 MB/s | **~210-360 MB/s** |
+| 随机访问一页 | 0.5-0.6 ms | **0.2-0.3 ms** |
+| 顺序整页解码 | 147 页/s | **162-166 页/s** |
+| 并行整页解码 | 741 页/s | **790-940 页/s** |
+| 缩略图（4 线程） | 1127 页/s | **1268-1563 页/s** |
+| 240 页并行解码峰值内存 | ~2.0 GB | **~640 MB**（缓存上限 512MB） |
+
+> 峰值内存问题源于被淘汰的 WPF 位图要等 GC 终结器才释放，现已通过内存压力上报 + 节流回收解决；上表优化前数据为早期实现实测。
+
+自行跑基准：
+
+```powershell
+# 生成基准样本（240 页 JPEG + 80 页 PNG，输出到 bench/）
+powershell -ExecutionPolicy Bypass -File tools/make-bench-samples.ps1
+
+# 对任意压缩包/文件夹跑基准，报告写入 txt
+dist\ComicReader-win-x64\ComicReader.exe --bench bench\big.cbz --bench-out bench\report.txt
+```
+
 ## 下载使用
 
 前往 [Releases](../../releases) 下载 `ComicReader-win-x64.zip`，解压后双击 `ComicReader.exe` 即可运行（自包含 .NET 运行时，无需额外安装）。
@@ -85,7 +113,8 @@ tools/                    图标与测试样本生成脚本
 ## 技术栈
 
 - .NET 10 + WPF
-- [SharpCompress](https://github.com/adamhathcock/sharpcompress)：纯托管 ZIP / RAR / 7Z / TAR 读取，无需外部解压程序
+- ZIP 解压走 .NET 原生 zlib（多实例池，支持并行读页）
+- [SharpCompress](https://github.com/adamhathcock/sharpcompress)：RAR / 7Z / TAR 与加密 ZIP 的纯托管读取，无需外部解压程序
 - CommunityToolkit.Mvvm
 
 ## 已知限制

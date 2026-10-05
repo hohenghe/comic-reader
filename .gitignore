@@ -11,5 +11,6 @@ dist/
 TestResults/
 data/
 samples/
+bench/
 *.zip
 !tools/*.zip

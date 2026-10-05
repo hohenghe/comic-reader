@@ -184,6 +184,40 @@ public partial class ReaderView : UserControl
         }
 
         ApplyFit();
+        PrefetchUpcoming();
+    }
+
+    /// <summary>
+    /// Warms the cache for the pages after the current one so page turns and
+    /// scrolls do not wait for decompression / decoding.
+    /// </summary>
+    private void PrefetchUpcoming()
+    {
+        var vm = _vm;
+        if (vm is null) return;
+        var start = vm.Mode == ReadingMode.Double ? vm.SpreadStart(vm.CurrentIndex) : vm.CurrentIndex;
+        for (var offset = 1; offset <= 3; offset++)
+        {
+            _ = PrefetchAsync(start + offset);
+        }
+    }
+
+    private async Task PrefetchAsync(int index)
+    {
+        var vm = _vm;
+        if (vm is null || index < 0 || index >= vm.PageCount) return;
+
+        var key = PageImageCache.MakeKey(vm.Book.Path, index);
+        if (AppServices.ImageCache.TryGet(key) is not null) return;
+
+        try
+        {
+            await AppServices.ImageCache.GetAsync(key, () => vm.Book.ReadPageBytes(index), CancellationToken.None);
+        }
+        catch
+        {
+            // Prefetch is best-effort.
+        }
     }
 
     private async Task LoadIntoAsync(Image target, int index, CancellationToken ct, int version)
@@ -551,7 +585,7 @@ public partial class ReaderView : UserControl
         if (first < 0) first = 0;
         if (last < 0) last = Math.Min(_scrollContainers.Count - 1, first);
 
-        for (var i = Math.Max(0, first - 2); i <= Math.Min(_scrollContainers.Count - 1, last + 2); i++)
+        for (var i = Math.Max(0, first - 2); i <= Math.Min(_scrollContainers.Count - 1, last + 4); i++)
         {
             StartScrollLoad(i);
         }
@@ -646,32 +680,53 @@ public partial class ReaderView : UserControl
         _thumbCts = new CancellationTokenSource();
         var ct = _thumbCts.Token;
         var version = ++_thumbVersion;
+        var dispatcher = Dispatcher;
+
+        using var workers = new SemaphoreSlim(3);
+        var tasks = new List<Task>(vm.PageCount);
 
         for (var i = 0; i < vm.PageCount; i++)
         {
-            if (ct.IsCancellationRequested || version != _thumbVersion) return;
-
-            var item = vm.Thumbs[i];
-            if (item.Image is not null) continue;
-
-            try
+            var index = i;
+            tasks.Add(Task.Run(async () =>
             {
-                var bitmap = await Task.Run(() =>
+                if (ct.IsCancellationRequested || version != _thumbVersion) return;
+                var item = vm.Thumbs[index];
+                if (item.Image is not null) return;
+
+                await workers.WaitAsync(ct).ConfigureAwait(false);
+                try
                 {
-                    var bytes = vm.Book.ReadPageBytes(i);
-                    return ImageDecoder.Decode(bytes, decodePixelHeight: 160);
-                }, ct);
+                    if (ct.IsCancellationRequested || version != _thumbVersion) return;
 
-                if (bitmap is not null && version == _thumbVersion) item.Image = bitmap;
-            }
-            catch (OperationCanceledException)
-            {
-                return;
-            }
-            catch
-            {
-                // Skip pages that fail to decode.
-            }
+                    var bytes = vm.Book.ReadPageBytes(index);
+                    var bitmap = ImageDecoder.Decode(bytes, decodePixelHeight: 160);
+                    if (bitmap is null || ct.IsCancellationRequested || version != _thumbVersion) return;
+
+                    await dispatcher.InvokeAsync(() => item.Image = bitmap);
+                }
+                catch (OperationCanceledException)
+                {
+                    // View closed or replaced.
+                }
+                catch
+                {
+                    // Skip pages that fail to decode.
+                }
+                finally
+                {
+                    workers.Release();
+                }
+            }, ct));
+        }
+
+        try
+        {
+            await Task.WhenAll(tasks);
+        }
+        catch
+        {
+            // Cancellation races are expected.
         }
     }
 
