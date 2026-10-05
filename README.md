@@ -1,8 +1,8 @@
-# ComicReader
+﻿# ComicReader
 
 一个类似 [Rulia](https://github.com/RuliaReader/Rulia) 的现代化 Windows 漫画阅读器：**直接读取压缩包**，无需解压，开箱即用。
 
-[![build-release](https://github.com/OWNER/comic-reader/actions/workflows/build-release.yml/badge.svg)](https://github.com/OWNER/comic-reader/actions/workflows/build-release.yml)
+[![build-release](https://github.com/hohenghe/comic-reader/actions/workflows/build-release.yml/badge.svg)](https://github.com/hohenghe/comic-reader/actions/workflows/build-release.yml)
 
 ## 功能特性
 
