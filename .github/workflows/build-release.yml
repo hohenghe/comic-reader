@@ -1,0 +1,53 @@
+name: build-release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    env:
+      NUGET_PACKAGES: ${{ github.workspace }}\.nuget\packages
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "1"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Run unit tests
+        run: dotnet test tests/ComicReader.Core.Tests -c Release --nologo
+
+      - name: Publish self-contained win-x64 build
+        run: >
+          dotnet publish src/ComicReader.App
+          -c Release -r win-x64 --self-contained true
+          -o dist/ComicReader-win-x64
+          -p:DebugType=none -p:DebugSymbols=false
+          --nologo
+
+      - name: Package
+        shell: powershell
+        run: Compress-Archive -Path dist/ComicReader-win-x64/* -DestinationPath dist/ComicReader-win-x64.zip -Force
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ComicReader-win-x64
+          path: dist/ComicReader-win-x64.zip
+
+      - name: Create release with exe package
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/ComicReader-win-x64.zip
+          generate_release_notes: true

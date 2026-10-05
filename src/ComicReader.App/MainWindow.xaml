@@ -1,0 +1,14 @@
+<Window x:Class="ComicReader.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="ComicReader"
+        Icon="Assets/app.ico"
+        Width="1340" Height="840"
+        MinWidth="920" MinHeight="600"
+        WindowStartupLocation="CenterScreen"
+        Background="{DynamicResource BgBrush}"
+        AllowDrop="True"
+        DragOver="OnDragOver"
+        Drop="OnDrop">
+    <ContentControl Content="{Binding CurrentView}" />
+</Window>

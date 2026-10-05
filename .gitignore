@@ -1,0 +1,15 @@
+bin/
+obj/
+dist/
+.nuget/
+.tmp/
+.dotnet/
+*.user
+*.suo
+.vs/
+*.log
+TestResults/
+data/
+samples/
+*.zip
+!tools/*.zip

@@ -1,0 +1,114 @@
+<UserControl x:Class="ComicReader.App.Views.SettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel MaxWidth="880" HorizontalAlignment="Center" Margin="30,24,30,60" Width="820">
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,18">
+                <Button Content="← 返回书库" Command="{Binding BackCommand}" />
+                <TextBlock Text="设置" FontSize="22" FontWeight="Bold" Margin="16,0,0,0" />
+            </StackPanel>
+
+            <TextBlock Text="阅读" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource FgMutedBrush}" Margin="0,0,0,4" />
+            <Border Background="{DynamicResource PanelBrush}" CornerRadius="10" Padding="18">
+                <StackPanel>
+                    <Grid Margin="0,6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="180" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="默认阅读模式" />
+                        <ComboBox Grid.Column="1" HorizontalAlignment="Left" Width="200"
+                                  ItemsSource="{Binding ModeOptions}" SelectedValue="{Binding DefaultMode}"
+                                  SelectedValuePath="Value" DisplayMemberPath="Name" />
+                    </Grid>
+                    <Grid Margin="0,6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="180" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="默认阅读方向" />
+                        <ComboBox Grid.Column="1" HorizontalAlignment="Left" Width="200"
+                                  ItemsSource="{Binding DirectionOptions}" SelectedValue="{Binding Direction}"
+                                  SelectedValuePath="Value" DisplayMemberPath="Name" />
+                    </Grid>
+                    <Grid Margin="0,6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="180" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="默认适应方式" />
+                        <ComboBox Grid.Column="1" HorizontalAlignment="Left" Width="200"
+                                  ItemsSource="{Binding FitOptions}" SelectedValue="{Binding DefaultFit}"
+                                  SelectedValuePath="Value" DisplayMemberPath="Name" />
+                    </Grid>
+                    <Grid Margin="0,6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="180" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="60" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="图片缓存上限" />
+                        <Slider Grid.Column="1" Minimum="64" Maximum="4096" TickFrequency="64"
+                                IsSnapToTickEnabled="True" Value="{Binding CacheMb}" VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="2" Text="{Binding CacheMb, StringFormat={}{0} MB}" HorizontalAlignment="Right" Foreground="{DynamicResource FgMutedBrush}" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <TextBlock Text="外观与安全" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource FgMutedBrush}" Margin="0,22,0,4" />
+            <Border Background="{DynamicResource PanelBrush}" CornerRadius="10" Padding="18">
+                <StackPanel>
+                    <Grid Margin="0,6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="180" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="主题" />
+                        <ComboBox Grid.Column="1" HorizontalAlignment="Left" Width="200"
+                                  ItemsSource="{Binding ThemeOptions}" SelectedValue="{Binding Theme}"
+                                  SelectedValuePath="Value" DisplayMemberPath="Name" />
+                    </Grid>
+                    <Grid Margin="0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="180" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="记住压缩包密码" />
+                        <CheckBox Grid.Column="1" IsChecked="{Binding RememberPasswords}" VerticalAlignment="Center" />
+                        <Button Grid.Column="2" Content="清除已保存的密码" HorizontalAlignment="Left" Margin="20,0,0,0"
+                                Command="{Binding ClearPasswordsCommand}" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <TextBlock Text="书库文件夹" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource FgMutedBrush}" Margin="0,22,0,4" />
+            <Border Background="{DynamicResource PanelBrush}" CornerRadius="10" Padding="18">
+                <StackPanel>
+                    <ListBox ItemsSource="{Binding Folders}" MaxHeight="220" Margin="0,0,0,10">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{Binding}" TextTrimming="CharacterEllipsis" />
+                                    <Button Grid.Column="1" Content="移除" Padding="10,3"
+                                            Command="{Binding DataContext.RemoveFolderCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                            CommandParameter="{Binding}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                    <Button Content="＋ 添加文件夹" HorizontalAlignment="Left" Command="{Binding AddFolderCommand}" />
+                </StackPanel>
+            </Border>
+
+            <TextBlock Text="ComicReader · 本地漫画阅读器 · 支持 CBZ/ZIP、CBR/RAR、CB7/7Z、TAR 与图片文件夹"
+                       Foreground="{DynamicResource FgMutedBrush}"
+                       Margin="0,26,0,0"
+                       TextAlignment="Center" />
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

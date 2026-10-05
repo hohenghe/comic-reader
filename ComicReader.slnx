@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/ComicReader.App/ComicReader.App.csproj" />
+    <Project Path="src/ComicReader.Core/ComicReader.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/ComicReader.Core.Tests/ComicReader.Core.Tests.csproj" />
+  </Folder>
+</Solution>
